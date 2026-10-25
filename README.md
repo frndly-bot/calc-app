@@ -7,6 +7,8 @@ A native desktop calculator with four modes — **Normal**, **Scientific**, **De
 
 <p align="center">
   <img src="docs/screenshots/normal.png" alt="Normal mode" width="320">
+  <br>
+  <sub>Normal mode in the default dark glass theme</sub>
 </p>
 
 ## Features
@@ -30,6 +32,8 @@ A native desktop calculator with four modes — **Normal**, **Scientific**, **De
 
 <p align="center">
   <img src="docs/screenshots/normal-light.png" alt="Light theme" width="320">
+  <br>
+  <sub>Normal mode in the light theme</sub>
 </p>
 
 ## Stack
