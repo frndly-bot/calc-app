@@ -1,5 +1,8 @@
 # Calc
 
+[![CI](https://github.com/frndly-bot/calc-app/actions/workflows/ci.yml/badge.svg)](https://github.com/frndly-bot/calc-app/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A native desktop calculator with four modes — **Normal**, **Scientific**, **Developer** and **Finance** — built with Go, Wails v3 and SvelteKit (Svelte 5). Dark glass by default, with a light theme, per-mode accent colours and a full keyboard workflow.
 
 ![Normal mode](docs/screenshots/normal.png)
@@ -41,7 +44,7 @@ A native desktop calculator with four modes — **Normal**, **Scientific**, **De
 Prerequisites: Go 1.27+, Node 24+, [pnpm](https://pnpm.io/), [Task](https://taskfile.dev/), the [Wails v3 CLI](https://v3.wails.io/), and the platform webview development packages (see [docs/development.md](docs/development.md)).
 
 ```bash
-git clone <repository-url> calc-app
+git clone https://github.com/frndly-bot/calc-app.git
 cd calc-app
 pnpm --dir frontend install
 
