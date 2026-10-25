@@ -1,0 +1,112 @@
+version: '3'
+
+includes:
+  common: ./build/Taskfile.yml
+  windows: ./build/windows/Taskfile.yml
+  darwin: ./build/darwin/Taskfile.yml
+  linux: ./build/linux/Taskfile.yml
+
+vars:
+  APP_NAME: calc-app
+  BIN_DIR: bin
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+
+tasks:
+  default:
+    summary: Lists the available tasks
+    cmds:
+      - task --list
+
+  build:
+    summary: Builds the native desktop application for the current OS
+    cmds:
+      - task: '{{OS}}:build'
+
+  package:
+    summary: Builds installers/packages for the current OS
+    cmds:
+      - task: '{{OS}}:package'
+
+  run:
+    summary: Runs the application built for the current OS
+    cmds:
+      - task: '{{OS}}:run'
+
+  dev:
+    summary: Runs the app with Wails hot reload (requires the wails3 CLI)
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  build:server:
+    summary: Builds the headless HTTP server used for browser testing
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - CGO_ENABLED=0 go build -tags server -buildvcs=false -o {{.BIN_DIR}}/calc-server .
+
+  serve:
+    summary: Serves the production frontend on http://localhost:34115
+    deps:
+      - task: build:server
+    cmds:
+      - ./{{.BIN_DIR}}/calc-server
+
+  test:
+    summary: Runs the Go and frontend test suites
+    cmds:
+      - task: test:go
+      - task: test:web
+
+  test:go:
+    summary: Runs the Go tests
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - CGO_ENABLED=0 go test -tags server ./...
+
+  test:web:
+    summary: Runs the frontend unit tests
+    dir: frontend
+    deps:
+      - task: common:install:frontend:deps
+    cmds:
+      - pnpm test
+
+  check:
+    summary: Runs type checking and Go vet
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - CGO_ENABLED=0 go vet -tags server ./...
+      - task: check:web
+
+  check:web:
+    summary: Runs svelte-check
+    dir: frontend
+    deps:
+      - task: common:install:frontend:deps
+    cmds:
+      - pnpm check
+
+  lint:
+    summary: Checks Go formatting and frontend checks
+    cmds:
+      - test -z "$(gofmt -l backend main.go)"
+      - task: check
+
+  generate:bindings:
+    summary: Regenerates Wails TS bindings into frontend/src/lib/bindings/generated
+    cmds:
+      - wails3 generate bindings -ts -clean=true -d frontend/src/lib/bindings/generated
+
+  generate:icons:
+    summary: Regenerates .ico/.icns assets from build/appicon.png
+    dir: build
+    cmds:
+      - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico
+
+  clean:
+    summary: Removes build output
+    cmds:
+      - rm -rf {{.BIN_DIR}} frontend/dist frontend/.svelte-kit wails_windows_*.syso

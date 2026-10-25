@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 / WebKitGTK build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        run: pnpm --dir frontend install --frozen-lockfile
+
+      # main.go embeds frontend/dist, so the frontend must exist before any Go
+      # build, vet, or test run.
+      - name: Build frontend
+        run: pnpm --dir frontend build
+
+      - name: Go vet
+        run: CGO_ENABLED=0 go vet -tags server ./...
+
+      - name: Go tests
+        run: CGO_ENABLED=0 go test -tags server ./...
+
+      - name: Svelte/TypeScript checks
+        run: pnpm --dir frontend check
+
+      - name: Frontend unit tests
+        run: pnpm --dir frontend test
+
+      - name: Build Linux desktop binary
+        run: go build -tags production -trimpath -buildvcs=false -o bin/calc-app .
+        env:
+          CGO_ENABLED: '1'

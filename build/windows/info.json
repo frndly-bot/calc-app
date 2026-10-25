@@ -1,0 +1,15 @@
+{
+	"fixed": {
+		"file_version": "0.1.0"
+	},
+	"info": {
+		"0000": {
+			"ProductVersion": "0.1.0",
+			"CompanyName": "Calc App Contributors",
+			"FileDescription": "A multi-mode calculator",
+			"LegalCopyright": "(c) 2026, Calc App Contributors",
+			"ProductName": "Calc",
+			"Comments": "Normal, scientific, developer and finance calculators."
+		}
+	}
+}

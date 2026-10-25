@@ -1,0 +1,65 @@
+version: '3'
+
+includes:
+  common: ../Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application for Windows
+    deps:
+      - task: common:go:mod:tidy
+      - task: common:build:frontend
+      - task: generate:syso
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - go build {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/{{.APP_NAME}}.exe
+      - cmd: powershell Remove-Item wails_windows_*.syso
+        platforms: [windows]
+      - cmd: rm -f wails_windows_*.syso
+        platforms: [linux, darwin]
+    vars:
+      BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production -trimpath -buildvcs=false -ldflags="-w -s -H windowsgui"{{else}}-buildvcs=false -gcflags=all="-l"{{end}}'
+    env:
+      GOOS: windows
+      CGO_ENABLED: 0
+      GOARCH: '{{.ARCH | default ARCH}}'
+      PRODUCTION: '{{.PRODUCTION | default "false"}}'
+
+  generate:syso:
+    summary: Generates the Windows resource file (icon, manifest, version info)
+    dir: build
+    sources:
+      - appicon.png
+      - windows/icon.ico
+      - windows/info.json
+      - windows/wails.exe.manifest
+    generates:
+      - ../wails_windows_{{.ARCH}}.syso
+    cmds:
+      - wails3 generate syso -arch {{.ARCH}} -icon windows/icon.ico -manifest windows/wails.exe.manifest -info windows/info.json -out ../wails_windows_{{.ARCH}}.syso
+    vars:
+      ARCH: '{{.ARCH | default ARCH}}'
+
+  package:
+    summary: Builds a production .exe and an NSIS installer
+    cmds:
+      - task: create:nsis:installer
+
+  create:nsis:installer:
+    summary: Creates an NSIS installer
+    dir: build/windows/nsis
+    deps:
+      - task: build
+        vars:
+          PRODUCTION: 'true'
+    cmds:
+      - wails3 generate webview2bootstrapper -dir .
+      - makensis -DARG_WAILS_{{.ARG_FLAG}}_BINARY="{{.ROOT_DIR}}/{{.BIN_DIR}}/{{.APP_NAME}}.exe" project.nsi
+    vars:
+      ARCH: '{{.ARCH | default ARCH}}'
+      ARG_FLAG: '{{if eq .ARCH "arm64"}}ARM64{{else}}AMD64{{end}}'
+
+  run:
+    summary: Runs the Windows build
+    cmds:
+      - ./{{.BIN_DIR}}/{{.APP_NAME}}.exe

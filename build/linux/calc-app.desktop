@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Calc
+GenericName=Calculator
+Comment=Normal, scientific, developer and finance calculators
+Exec=calc-app
+Icon=appicon
+Terminal=false
+Categories=Utility;Calculator;
+Keywords=calculator;math;finance;programmer;
+StartupWMClass=calc-app

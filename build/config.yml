@@ -1,0 +1,42 @@
+# Build/runtime metadata used by the Wails v3 CLI.
+# After changing `info`, regenerate platform assets with:
+#   wails3 task generate:icons
+version: '3'
+
+info:
+  companyName: 'Calc App Contributors'
+  productName: 'Calc'
+  productIdentifier: 'com.zcode.calc'
+  description: 'A multi-mode calculator: normal, scientific, developer and finance.'
+  copyright: '(c) 2026, Calc App Contributors'
+  comments: 'Normal, scientific, developer and finance calculators in one desktop app.'
+  version: '0.1.0'
+
+dev_mode:
+  root_path: .
+  log_level: warn
+  debounce: 1000
+  ignore:
+    dir:
+      - .git
+      - node_modules
+      - frontend
+      - bin
+    file:
+      - .DS_Store
+      - .gitignore
+      - .gitkeep
+    watched_extension:
+      - '*.go'
+    git_ignore: true
+  executes:
+    - cmd: wails3 task common:install:frontend:deps
+      type: once
+    - cmd: wails3 task common:dev:frontend
+      type: background
+    - cmd: go mod tidy
+      type: blocking
+    - cmd: wails3 task build
+      type: blocking
+    - cmd: wails3 task run
+      type: primary

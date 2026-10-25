@@ -1,0 +1,15 @@
+* text=auto eol=lf
+
+*.go text
+*.svelte text
+*.ts text
+*.css text
+*.json text
+*.yml text
+*.yaml text
+*.md text
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.icns binary

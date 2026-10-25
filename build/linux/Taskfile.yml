@@ -1,0 +1,76 @@
+version: '3'
+
+includes:
+  common: ../Taskfile.yml
+
+tasks:
+  build:
+    summary: Builds the application for Linux
+    deps:
+      - task: common:go:mod:tidy
+      - task: common:build:frontend
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - go build {{.BUILD_FLAGS}} -o {{.BIN_DIR}}/{{.APP_NAME}}
+    vars:
+      BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production -trimpath -buildvcs=false -ldflags="-w -s"{{else}}-buildvcs=false -gcflags=all="-l"{{end}}'
+    env:
+      GOOS: linux
+      CGO_ENABLED: 1
+      GOARCH: '{{.ARCH | default ARCH}}'
+      PRODUCTION: '{{.PRODUCTION | default "false"}}'
+
+  package:
+    summary: Packages the app as an AppImage and a .deb
+    deps:
+      - task: build
+        vars:
+          PRODUCTION: 'true'
+    cmds:
+      - task: create:appimage
+      - task: create:deb
+
+  create:appimage:
+    summary: Creates an AppImage
+    dir: build/linux/appimage
+    deps:
+      - task: build
+        vars:
+          PRODUCTION: 'true'
+    cmds:
+      - mkdir -p .
+      - cp ../../../{{.BIN_DIR}}/{{.APP_NAME}} {{.APP_NAME}}
+      - cp ../../appicon.png appicon.png
+      - wails3 generate appimage -binary {{.APP_NAME}} -icon appicon.png -desktopfile ../{{.APP_NAME}}.desktop -outputdir ../../../{{.BIN_DIR}} -builddir ./build
+
+  create:deb:
+    summary: Creates a Debian package
+    deps:
+      - task: build
+        vars:
+          PRODUCTION: 'true'
+    cmds:
+      - wails3 tool package -name {{.APP_NAME}} -format deb -config ./build/linux/nfpm/nfpm.yaml -out ./{{.BIN_DIR}}
+
+  create:rpm:
+    summary: Creates an RPM package
+    deps:
+      - task: build
+        vars:
+          PRODUCTION: 'true'
+    cmds:
+      - wails3 tool package -name {{.APP_NAME}} -format rpm -config ./build/linux/nfpm/nfpm.yaml -out ./{{.BIN_DIR}}
+
+  create:aur:
+    summary: Creates an Arch Linux package
+    deps:
+      - task: build
+        vars:
+          PRODUCTION: 'true'
+    cmds:
+      - wails3 tool package -name {{.APP_NAME}} -format archlinux -config ./build/linux/nfpm/nfpm.yaml -out ./{{.BIN_DIR}}
+
+  run:
+    summary: Runs the Linux build
+    cmds:
+      - ./{{.BIN_DIR}}/{{.APP_NAME}}

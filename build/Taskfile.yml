@@ -1,0 +1,67 @@
+version: '3'
+
+tasks:
+  go:mod:tidy:
+    summary: Runs go mod tidy
+    internal: true
+    cmds:
+      - go mod tidy
+
+  install:frontend:deps:
+    summary: Installs frontend dependencies
+    dir: frontend
+    sources:
+      - package.json
+      - pnpm-lock.yaml
+    generates:
+      - node_modules/.modules.yaml
+    preconditions:
+      - sh: pnpm --version
+        msg: 'pnpm is required: https://pnpm.io/installation'
+    cmds:
+      - pnpm install --frozen-lockfile
+
+  build:frontend:
+    summary: Builds the SvelteKit frontend into frontend/dist
+    dir: frontend
+    sources:
+      - src/**/*
+      - static/**/*
+      - package.json
+      - pnpm-lock.yaml
+      - vite.config.ts
+      - tsconfig.json
+    generates:
+      - dist/index.html
+    deps:
+      - task: install:frontend:deps
+    cmds:
+      - pnpm run build
+
+  dev:frontend:
+    summary: Runs the frontend dev server
+    dir: frontend
+    deps:
+      - task: install:frontend:deps
+    cmds:
+      - pnpm run dev
+
+  generate:bindings:
+    summary: Generates TypeScript bindings from the Go services
+    sources:
+      - '**/*.go'
+      - go.mod
+      - go.sum
+    cmds:
+      - wails3 generate bindings -ts -clean=true -d frontend/src/lib/bindings/generated
+
+  generate:icons:
+    summary: Generates Windows .ico and macOS .icns from build/appicon.png
+    dir: build
+    sources:
+      - appicon.png
+    generates:
+      - darwin/icons.icns
+      - windows/icon.ico
+    cmds:
+      - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico

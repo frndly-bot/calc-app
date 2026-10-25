@@ -1,0 +1,87 @@
+version: '3'
+
+includes:
+  common: ../Taskfile.yml
+
+vars:
+  APP_BUNDLE: Calc.app
+  APP_VERSION: 0.1.0
+
+tasks:
+  build:
+    summary: Builds the application for macOS
+    deps:
+      - task: common:go:mod:tidy
+      - task: common:build:frontend
+    cmds:
+      - mkdir -p {{.BIN_DIR}}
+      - go build {{.BUILD_FLAGS}} -o {{.OUTPUT}}
+    vars:
+      BUILD_FLAGS: '{{if eq .PRODUCTION "true"}}-tags production -trimpath -buildvcs=false -ldflags="-w -s"{{else}}-buildvcs=false -gcflags=all="-l"{{end}}'
+      DEFAULT_OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}'
+      OUTPUT: '{{.OUTPUT | default .DEFAULT_OUTPUT}}'
+    env:
+      GOOS: darwin
+      CGO_ENABLED: 1
+      GOARCH: '{{.ARCH | default ARCH}}'
+      CGO_CFLAGS: '-mmacosx-version-min=12.0'
+      CGO_LDFLAGS: '-mmacosx-version-min=12.0'
+      MACOSX_DEPLOYMENT_TARGET: '12.0'
+      PRODUCTION: '{{.PRODUCTION | default "false"}}'
+
+  build:universal:
+    summary: Builds a universal (arm64 + amd64) binary
+    deps:
+      - task: build
+        vars:
+          ARCH: amd64
+          OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}-amd64'
+      - task: build
+        vars:
+          ARCH: arm64
+          OUTPUT: '{{.BIN_DIR}}/{{.APP_NAME}}-arm64'
+    cmds:
+      - lipo -create -output '{{.BIN_DIR}}/{{.APP_NAME}}' '{{.BIN_DIR}}/{{.APP_NAME}}-amd64' '{{.BIN_DIR}}/{{.APP_NAME}}-arm64'
+      - rm '{{.BIN_DIR}}/{{.APP_NAME}}-amd64' '{{.BIN_DIR}}/{{.APP_NAME}}-arm64'
+
+  package:
+    summary: Builds a production .app bundle and a .dmg
+    deps:
+      - task: build
+        vars:
+          PRODUCTION: 'true'
+    cmds:
+      - task: create:app:bundle
+      - task: create:dmg
+
+  package:universal:
+    summary: Packages a universal .app bundle and .dmg
+    deps:
+      - task: build:universal
+    cmds:
+      - task: create:app:bundle
+      - task: create:dmg
+
+  create:app:bundle:
+    summary: Creates a macOS .app bundle
+    cmds:
+      - mkdir -p '{{.BIN_DIR}}/{{.APP_BUNDLE}}/Contents/MacOS' '{{.BIN_DIR}}/{{.APP_BUNDLE}}/Contents/Resources'
+      - cp build/darwin/icons.icns '{{.BIN_DIR}}/{{.APP_BUNDLE}}/Contents/Resources/'
+      - cp '{{.BIN_DIR}}/{{.APP_NAME}}' '{{.BIN_DIR}}/{{.APP_BUNDLE}}/Contents/MacOS/'
+      - cp build/darwin/Info.plist '{{.BIN_DIR}}/{{.APP_BUNDLE}}/Contents/'
+      - codesign --force --deep --sign - '{{.BIN_DIR}}/{{.APP_BUNDLE}}'
+
+  create:dmg:
+    summary: Creates a compressed .dmg from the .app bundle
+    cmds:
+      - hdiutil create -volname 'Calc' -srcfolder '{{.BIN_DIR}}/{{.APP_BUNDLE}}' -ov -format UDZO '{{.BIN_DIR}}/Calc-{{.APP_VERSION}}.dmg'
+
+  run:
+    summary: Runs the macOS dev build
+    cmds:
+      - mkdir -p '{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/MacOS' '{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Resources'
+      - cp build/darwin/icons.icns '{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Resources/'
+      - cp '{{.BIN_DIR}}/{{.APP_NAME}}' '{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/MacOS/'
+      - cp build/darwin/Info.dev.plist '{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/Info.plist'
+      - codesign --force --deep --sign - '{{.BIN_DIR}}/{{.APP_NAME}}.dev.app'
+      - '{{.BIN_DIR}}/{{.APP_NAME}}.dev.app/Contents/MacOS/{{.APP_NAME}}'
