@@ -73,6 +73,15 @@ tasks:
     cmds:
       - pnpm test
 
+  test:e2e:
+    summary: Runs the Playwright end-to-end suite against the headless server
+    dir: frontend
+    deps:
+      - task: common:build:frontend
+      - task: common:install:frontend:deps
+    cmds:
+      - pnpm test:e2e
+
   check:
     summary: Runs type checking and Go vet
     deps:

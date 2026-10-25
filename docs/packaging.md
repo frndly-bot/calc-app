@@ -178,10 +178,12 @@ These steps require Apple credentials and are intentionally not automated in the
 
 - installs GTK4/WebKitGTK development packages;
 - runs Go tests;
-- runs `svelte-check`, Vitest and the production frontend build;
+- runs `svelte-check`, Vitest, Playwright and the production frontend build;
 - builds the Linux desktop binary with `CGO_ENABLED=1`.
 
-CI does not publish packages. Windows and macOS artifacts require their own runners (for example a GitHub Actions matrix with `windows-latest` and `macos-latest`), because the platform Taskfiles call native tools (`makensis`, `hdiutil`, `lipo`, `codesign`).
+CI validates the project but does not publish packages. Pushing a `v*` tag triggers [.github/workflows/release.yml](../.github/workflows/release.yml), which builds the Linux binary, AppImage, `.deb`, `.rpm` and Arch package, writes `SHA256SUMS`, and creates the GitHub release with generated notes. The package version comes from the tag, and the hardcoded versions in `build/config.yml` and `build/linux/nfpm/nfpm.yaml` are rewritten in the runner only.
+
+Windows and macOS artifacts require their own runners (for example a GitHub Actions matrix with `windows-latest` and `macos-latest`), because the platform Taskfiles call native tools (`makensis`, `hdiutil`, `lipo`, `codesign`).
 
 ## Release checklist
 
@@ -193,13 +195,13 @@ CI does not publish packages. Windows and macOS artifacts require their own runn
 6. **Packages** — run `task package` on each target OS; verify the artifacts launch from a clean install.
 7. **Signing** — sign Windows/macOS artifacts where distribution requires it; document checksums.
 8. **Evidence** — refresh `docs/screenshots/` if the UI changed, and update the README feature list.
-9. **Tag and publish** — create an annotated tag matching the version and attach the per-platform artifacts.
+9. **Tag and publish** — push an annotated tag matching the version (`git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3`). The release workflow publishes the Linux artifacts; attach Windows/macOS builds manually.
 
 ## What is not included
 
 - Automatic updates.
 - Code signing certificates or notarization credentials.
-- A cross-platform release pipeline that builds every installer in one workflow.
+- A cross-platform release pipeline that builds every installer in one workflow. The tag workflow publishes Linux packages only.
 - Package repository publishing (APT/RPM/Homebrew/Chocolatey).
 
 These require external accounts, secrets and infrastructure and should be added deliberately when the project has a distribution target.

@@ -16,6 +16,28 @@ A native desktop calculator with four modes — **Normal**, **Scientific**, **De
   </tr>
 </table>
 
+## Download
+
+Grab the latest Linux build from [Releases](https://github.com/frndly-bot/calc-app/releases/latest). Pushing a `v*` tag builds and publishes the AppImage, Debian, RPM and Arch packages; asset names include the version (for example `calc-app_1.2.3_amd64.deb`) and releases produced by that workflow include a `SHA256SUMS` file.
+
+| Package | Best for | Install |
+| --- | --- | --- |
+| `calc-app*.AppImage` | Any Linux, no install needed | `chmod +x ./calc-app*.AppImage && ./calc-app*.AppImage` |
+| `calc-app*.deb` | Debian, Ubuntu, Mint | `sudo apt install ./calc-app*.deb` |
+| `calc-app*.rpm` | Fedora, RHEL, openSUSE | `sudo dnf install ./calc-app*.rpm` |
+| `calc-app*.pkg.tar.zst` | Arch Linux | `sudo pacman -U calc-app*.pkg.tar.zst` |
+| `calc-app` or `calc-app_*_linux_amd64` | Portable raw binary | `chmod +x <file> && ./<file>` |
+
+The .deb and .rpm packages pull in GTK4 and WebKitGTK 6.0 automatically. The AppImage and raw binary use the system webview, so install `libgtk-4-1` and `libwebkitgtk-6.0-4` first on minimal distributions.
+
+macOS and Windows builds are not published yet; see [docs/packaging.md](docs/packaging.md) to build them locally.
+
+When the release includes checksums, verify a download with:
+
+```bash
+sha256sum --check SHA256SUMS
+```
+
 ## Features
 
 - **Normal** — instant arithmetic in TypeScript with `%`, `±`, parentheses, memory keys and an expression preview.
@@ -57,7 +79,7 @@ A native desktop calculator with four modes — **Normal**, **Scientific**, **De
 | Backend | Go 1.27, pure calculation packages + Wails services |
 | Frontend | SvelteKit 3, Svelte 5 runes, TypeScript, Vite 8 |
 | Styling | Hand-written CSS, glass surfaces, per-mode CSS variables |
-| Tests | `go test`, Vitest |
+| Tests | `go test`, Vitest, Playwright |
 | Packaging | Task, Wails v3 platform taskfiles, NSIS, AppImage/deb, .app/dmg |
 
 ## Quick start
@@ -87,9 +109,12 @@ task serve        # builds frontend + server binary, serves http://localhost:341
 
 ```bash
 task test         # Go tests + Vitest
+task test:e2e     # Playwright against the headless server
 task check        # go vet + svelte-check
 task lint         # gofmt check + all of the above
 ```
+
+The first E2E run needs a browser: `pnpm --dir frontend exec playwright install chromium`.
 
 ## Task reference
 
@@ -102,6 +127,7 @@ task lint         # gofmt check + all of the above
 | `task package` | AppImage + deb (Linux), NSIS (Windows), .app + dmg (macOS) |
 | `task serve` | Headless HTTP preview on port 34115 |
 | `task test` | Go and frontend unit tests |
+| `task test:e2e` | Playwright end-to-end tests |
 | `task check` | `go vet` and `svelte-check` |
 | `task generate:icons` | Regenerate `.ico`/`.icns` from `build/appicon.png` |
 | `task generate:bindings` | Optional Wails TS binding generation (see docs) |

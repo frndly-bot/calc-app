@@ -10,6 +10,11 @@ frontend/node_modules/
 frontend/.svelte-kit/
 frontend/dist/
 
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+
 # Generated Wails bindings (the checked-in wrapper is frontend/src/lib/bindings/index.ts)
 frontend/src/lib/bindings/generated/
 

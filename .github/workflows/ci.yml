@@ -59,6 +59,12 @@ jobs:
       - name: Frontend unit tests
         run: pnpm --dir frontend test
 
+      - name: Install the Playwright browser
+        run: pnpm --dir frontend exec playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: pnpm --dir frontend test:e2e
+
       - name: Build Linux desktop binary
         run: go build -tags production -trimpath -buildvcs=false -o bin/calc-app .
         env:

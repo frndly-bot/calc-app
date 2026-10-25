@@ -1,0 +1,137 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+env:
+  WAILS_VERSION: v3.0.0-beta.34
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Install GTK4 / WebKitGTK build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev build-essential file
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        run: pnpm --dir frontend install --frozen-lockfile
+
+      # main.go embeds frontend/dist, so it must exist before any Go step.
+      - name: Build frontend
+        run: pnpm --dir frontend build
+
+      - name: Go vet
+        run: CGO_ENABLED=0 go vet -tags server ./...
+
+      - name: Go tests
+        run: CGO_ENABLED=0 go test -tags server ./...
+
+      - name: Svelte/TypeScript checks
+        run: pnpm --dir frontend check
+
+      - name: Frontend unit tests
+        run: pnpm --dir frontend test
+
+      - name: Install the Playwright browser
+        run: pnpm --dir frontend exec playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        run: pnpm --dir frontend test:e2e
+
+      - name: Install the Wails CLI
+        run: |
+          go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Derive version from the tag
+        run: |
+          set -euo pipefail
+          echo "TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Stamp the version
+        run: |
+          set -euo pipefail
+          sed -i "s/^  version: '.*'/  version: '${VERSION}'/" build/config.yml
+          sed -i "s/^version: '.*'/version: '${VERSION}'/" build/linux/nfpm/nfpm.yaml
+          node -e "const fs=require('node:fs');const p='frontend/package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.version=process.env.VERSION;fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')"
+
+      - name: Build the production binary
+        run: |
+          set -euo pipefail
+          mkdir -p bin
+          CGO_ENABLED=1 go build -tags production -trimpath -buildvcs=false -ldflags="-w -s" -o bin/calc-app .
+
+      - name: Build Linux packages
+        run: |
+          set -euo pipefail
+          wails3 tool package -name calc-app -format deb -config ./build/linux/nfpm/nfpm.yaml -out ./bin
+          wails3 tool package -name calc-app -format rpm -config ./build/linux/nfpm/nfpm.yaml -out ./bin
+          wails3 tool package -name calc-app -format archlinux -config ./build/linux/nfpm/nfpm.yaml -out ./bin
+
+      - name: Build the AppImage
+        run: |
+          set -euo pipefail
+          mkdir -p build/linux/appimage
+          cp bin/calc-app build/linux/appimage/calc-app
+          cp build/appicon.png build/linux/appimage/appicon.png
+          cd build/linux/appimage
+          wails3 generate appimage -binary calc-app -icon appicon.png -desktopfile ../calc-app.desktop -outputdir ../../../bin -builddir ./build
+
+      - name: Name assets and write checksums
+        run: |
+          set -euo pipefail
+          cd bin
+          mv calc-app "calc-app_${VERSION}_linux_amd64"
+          mv calc-app.deb "calc-app_${VERSION}_amd64.deb"
+          mv calc-app.rpm "calc-app-${VERSION}-1.x86_64.rpm"
+          mv calc-app.pkg.tar.zst "calc-app-${VERSION}-1-x86_64.pkg.tar.zst"
+          mv calc-app-x86_64.AppImage "calc-app-${VERSION}-x86_64.AppImage"
+          sha256sum \
+            "calc-app_${VERSION}_linux_amd64" \
+            "calc-app_${VERSION}_amd64.deb" \
+            "calc-app-${VERSION}-1.x86_64.rpm" \
+            "calc-app-${VERSION}-1-x86_64.pkg.tar.zst" \
+            "calc-app-${VERSION}-x86_64.AppImage" > SHA256SUMS
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" bin/calc-app* bin/SHA256SUMS --clobber
+          else
+            gh release create "$TAG" bin/calc-app* bin/SHA256SUMS \
+              --title "Calc $TAG" \
+              --generate-notes \
+              --verify-tag
+          fi

@@ -63,12 +63,12 @@ task serve
 # http://localhost:34115
 ```
 
-`task serve` builds the frontend, compiles `bin/calc-server` with `CGO_ENABLED=0 -tags server`, and runs it. The server embeds the same assets and serves the same services over HTTP. Without the Wails runtime, persistence calls fail softly: settings use defaults, history stays empty, and the interface still renders and evaluates Normal mode locally.
+`task serve` builds the frontend, compiles `bin/calc-server` with `CGO_ENABLED=0 -tags server`, and runs it. The server embeds the same assets and exposes the same Wails services over HTTP, so all four modes work in the browser. Only a plain `vite dev` session lacks the runtime; there, persistence calls fail softly and Normal mode still evaluates locally.
 
-Stop the process with `Ctrl+C`. To isolate state while testing, point the config directory somewhere disposable:
+Stop the process with `Ctrl+C`. To isolate state while testing, point the config directory somewhere disposable and, if 34115 is taken, pick another port:
 
 ```bash
-XDG_CONFIG_HOME=$(mktemp -d) ./bin/calc-server
+XDG_CONFIG_HOME=$(mktemp -d) CALC_PORT=34116 ./bin/calc-server
 ```
 
 ## Everyday commands
@@ -83,6 +83,7 @@ XDG_CONFIG_HOME=$(mktemp -d) ./bin/calc-server
 | `task build:server` | Frontend build + headless server binary |
 | `task serve` | Build and serve on port 34115 |
 | `task test` | Go tests + Vitest |
+| `task test:e2e` | Playwright end-to-end suite |
 | `task check` | `go vet` + `svelte-check` |
 | `task lint` | `gofmt` check + `task check` |
 | `task generate:bindings` | Optional Wails TS bindings into `frontend/src/lib/bindings/generated` |
@@ -118,6 +119,21 @@ pnpm --dir frontend test:watch
 ```
 
 Vitest runs in a Node environment (`frontend/vitest.config.ts`), so only pure TypeScript is unit-tested there. Component behaviour is verified through the headless server in a browser.
+
+### End-to-end tests
+
+```bash
+pnpm --dir frontend exec playwright install chromium   # once
+task test:e2e
+```
+
+Playwright starts the headless Go server itself (`go run -tags server .`) on port 34116, waits for it, and drives Chromium through all four modes, the finance keypad, history, the theme toggle and keyboard input. Each run gets a fresh `XDG_CONFIG_HOME` under the system temp directory, so test history and settings never touch your real profile. Set `CALC_E2E_PORT` to move the server if 34116 is occupied.
+
+The config lives in `frontend/playwright.config.ts`; specs are in `frontend/e2e/`. Run a single file with:
+
+```bash
+pnpm --dir frontend exec playwright test e2e/developer.spec.ts
+```
 
 ### Type checking and formatting
 
@@ -184,7 +200,8 @@ The wrapper deliberately centralizes the package FQN (`calc-app/backend/services
 2. Go tests.
 3. `svelte-check`.
 4. Vitest.
-5. Frontend production build.
-6. Linux desktop binary with `CGO_ENABLED=1`.
+5. Playwright end-to-end tests (Chromium installed in the job).
+6. Frontend production build.
+7. Linux desktop binary with `CGO_ENABLED=1`.
 
-Cross-platform packaging is documented separately in [packaging.md](packaging.md); Windows and macOS artifacts are built on their target operating systems.
+Pushing a `v*` tag runs [.github/workflows/release.yml](../.github/workflows/release.yml), which repeats the checks, builds the Linux desktop binary, AppImage, `.deb`, `.rpm` and Arch packages, writes `SHA256SUMS`, and publishes them as a GitHub release. Cross-platform packaging is documented separately in [packaging.md](packaging.md); Windows and macOS artifacts are built on their target operating systems.

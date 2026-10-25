@@ -6,6 +6,8 @@ package main
 import (
 	"embed"
 	"log"
+	"os"
+	"strconv"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
@@ -14,6 +16,15 @@ import (
 
 //go:embed all:frontend/dist
 var assets embed.FS
+
+func serverPort() int {
+	if value := os.Getenv("CALC_PORT"); value != "" {
+		if port, err := strconv.Atoi(value); err == nil && port > 0 && port < 65536 {
+			return port
+		}
+	}
+	return 34115
+}
 
 func main() {
 	history := &services.HistoryService{}
@@ -39,7 +50,7 @@ func main() {
 		// Used by the browser preview build (go build -tags server).
 		Server: application.ServerOptions{
 			Host: "localhost",
-			Port: 34115,
+			Port: serverPort(),
 		},
 		Mac: application.MacOptions{
 			ApplicationShouldTerminateAfterLastWindowClosed: true,
