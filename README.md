@@ -5,11 +5,16 @@
 
 A native desktop calculator with four modes — **Normal**, **Scientific**, **Developer** and **Finance** — built with Go, Wails v3 and SvelteKit (Svelte 5). Dark glass by default, with a light theme, per-mode accent colours and a full keyboard workflow.
 
-<p align="center">
-  <img src="docs/screenshots/normal.png" alt="Normal mode" width="320">
-  <br>
-  <sub>Normal mode in the default dark glass theme</sub>
-</p>
+<table align="center">
+  <tr>
+    <th align="center">Dark theme</th>
+    <th align="center">Light theme</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/normal.png" alt="Normal mode in the dark theme" width="280"></td>
+    <td align="center"><img src="docs/screenshots/normal-light.png" alt="Normal mode in the light theme" width="280"></td>
+  </tr>
+</table>
 
 ## Features
 
@@ -43,12 +48,6 @@ A native desktop calculator with four modes — **Normal**, **Scientific**, **De
     <td align="center"><img src="docs/screenshots/history.png" alt="History panel" width="280"></td>
   </tr>
 </table>
-
-<p align="center">
-  <img src="docs/screenshots/normal-light.png" alt="Light theme" width="320">
-  <br>
-  <sub>Normal mode in the light theme</sub>
-</p>
 
 ## Stack
 
