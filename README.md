@@ -22,13 +22,27 @@ A native desktop calculator with four modes — **Normal**, **Scientific**, **De
 - **Keyboard-first** — digits, operators, Enter, Backspace and Escape work in every mode.
 - **Reduced motion** — animations are disabled automatically under `prefers-reduced-motion`.
 
-| Scientific | Developer |
-| :---: | :---: |
-| <img src="docs/screenshots/scientific.png" alt="Scientific mode" width="280"> | <img src="docs/screenshots/developer.png" alt="Developer mode" width="280"> |
+<table align="center">
+  <tr>
+    <th align="center">Scientific</th>
+    <th align="center">Developer</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/scientific.png" alt="Scientific mode" width="280"></td>
+    <td align="center"><img src="docs/screenshots/developer.png" alt="Developer mode" width="280"></td>
+  </tr>
+</table>
 
-| Finance | History |
-| :---: | :---: |
-| <img src="docs/screenshots/finance.png" alt="Finance mode" width="280"> | <img src="docs/screenshots/history.png" alt="History panel" width="280"> |
+<table align="center">
+  <tr>
+    <th align="center">Finance</th>
+    <th align="center">History</th>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/finance.png" alt="Finance mode" width="280"></td>
+    <td align="center"><img src="docs/screenshots/history.png" alt="History panel" width="280"></td>
+  </tr>
+</table>
 
 <p align="center">
   <img src="docs/screenshots/normal-light.png" alt="Light theme" width="320">
