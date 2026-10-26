@@ -230,14 +230,6 @@ jobs:
             "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;26.3.11579264" >/dev/null
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.3.11579264" >> "$GITHUB_ENV"
 
-      # The wails3 CLI compiles the cgo-backed linux application package, which
-      # pkg-config resolves against GTK4/WebKitGTK even when only targeting
-      # Android.
-      - name: Install GTK4 / WebKitGTK build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
-
       - name: Install frontend dependencies
         run: pnpm --dir frontend install --frozen-lockfile
 
@@ -245,8 +237,10 @@ jobs:
         run: pnpm --dir frontend build
 
       - name: Install the Wails and Task CLIs
+        # CGO disabled keeps the wails3 CLI free of the GTK/WebKit
+        # pkg-config requirements; the Android compile itself uses the NDK.
         run: |
-          go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+          CGO_ENABLED=0 go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
           go install github.com/wailsapp/task/v3/cmd/task@${{ env.TASK_VERSION }}
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
