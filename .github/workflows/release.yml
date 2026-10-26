@@ -9,9 +9,11 @@ permissions:
 
 env:
   WAILS_VERSION: v3.0.0-beta.34
+  # go-task, the same patched fork Wails v3 ships for its taskfiles
+  TASK_VERSION: v3.40.1-patched3
 
 jobs:
-  release:
+  linux:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out
@@ -74,7 +76,6 @@ jobs:
       - name: Derive version from the tag
         run: |
           set -euo pipefail
-          echo "TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
           echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
       - name: Stamp the version
@@ -106,7 +107,7 @@ jobs:
           cd build/linux/appimage
           wails3 generate appimage -binary calc-app -icon appicon.png -desktopfile ../calc-app.desktop -outputdir ../../../bin -builddir ./build
 
-      - name: Name assets and write checksums
+      - name: Name assets
         run: |
           set -euo pipefail
           cd bin
@@ -115,22 +116,188 @@ jobs:
           mv calc-app.rpm "calc-app-${VERSION}-1.x86_64.rpm"
           mv calc-app.pkg.tar.zst "calc-app-${VERSION}-1-x86_64.pkg.tar.zst"
           mv calc-app-x86_64.AppImage "calc-app-${VERSION}-x86_64.AppImage"
-          sha256sum \
-            "calc-app_${VERSION}_linux_amd64" \
-            "calc-app_${VERSION}_amd64.deb" \
-            "calc-app-${VERSION}-1.x86_64.rpm" \
-            "calc-app-${VERSION}-1-x86_64.pkg.tar.zst" \
-            "calc-app-${VERSION}-x86_64.AppImage" > SHA256SUMS
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: bin/calc-app*
+          if-no-files-found: error
+
+  macos:
+    runs-on: macos-latest  # arm64 runner
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        run: pnpm --dir frontend install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm --dir frontend build
+
+      - name: Install the Wails and Task CLIs
+        run: |
+          go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+          go install github.com/wailsapp/task/v3/cmd/task@${{ env.TASK_VERSION }}
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Derive version from the tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Stamp the version
+        run: |
+          set -euo pipefail
+          sed -i '' "s/^  version: '.*'/  version: '${VERSION}'/" build/config.yml
+          node -e "const fs=require('node:fs');const p='frontend/package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.version=process.env.VERSION;fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')"
+
+      # Builds the arm64 binary, assembles Calc.app (ad-hoc signed) and a
+      # compressed dmg; APP_VERSION only names the dmg file.
+      - name: Build the macOS app bundle and dmg
+        run: task darwin:package APP_VERSION=${VERSION}
+
+      - name: Name assets
+        run: |
+          set -euo pipefail
+          mv "bin/Calc-${VERSION}.dmg" "bin/Calc-${VERSION}-arm64.dmg"
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: bin/*.dmg
+          if-no-files-found: error
+
+  android:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install Android SDK components
+        run: |
+          set -euo pipefail
+          test -x "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" || {
+            echo "cmdline-tools not found under ANDROID_HOME=$ANDROID_HOME" >&2
+            exit 1
+          }
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;26.3.11579264" >/dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.3.11579264" >> "$GITHUB_ENV"
+
+      - name: Install frontend dependencies
+        run: pnpm --dir frontend install --frozen-lockfile
+
+      - name: Build frontend
+        run: pnpm --dir frontend build
+
+      - name: Install the Wails and Task CLIs
+        run: |
+          go install github.com/wailsapp/wails/v3/cmd/wails3@${{ env.WAILS_VERSION }}
+          go install github.com/wailsapp/task/v3/cmd/task@${{ env.TASK_VERSION }}
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Derive version from the tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Stamp the version
+        run: |
+          set -euo pipefail
+          sed -i "s/^  version: '.*'/  version: '${VERSION}'/" build/config.yml
+          sed -i "s/versionName \".*\"/versionName \"${VERSION}\"/" build/android/app/build.gradle
+          node -e "const fs=require('node:fs');const p='frontend/package.json';const j=JSON.parse(fs.readFileSync(p,'utf8'));j.version=process.env.VERSION;fs.writeFileSync(p,JSON.stringify(j,null,2)+'\n')"
+
+      # Builds libwails.so for arm64 with the NDK and assembles the release
+      # APK. Without keystore secrets it is signed with the debug keystore,
+      # which installs fine for side-loading; Play Store uploads need a real
+      # keystore (ANDROID_KEYSTORE_* env vars).
+      - name: Build the release APK
+        run: task android:package
+
+      - name: Name assets
+        run: |
+          set -euo pipefail
+          mv bin/calc-app.apk "bin/calc-app_${VERSION}_android_arm64.apk"
+
+      - name: Upload Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: bin/*.apk
+          if-no-files-found: error
+
+  publish:
+    needs: [linux, macos, android]
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Collect artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Write checksums
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum * > SHA256SUMS
 
       - name: Publish the GitHub release
         env:
-          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" bin/calc-app* bin/SHA256SUMS --clobber
+            gh release upload "$TAG" dist/* --clobber
           else
-            gh release create "$TAG" bin/calc-app* bin/SHA256SUMS \
+            gh release create "$TAG" dist/* \
               --title "Calc $TAG" \
               --generate-notes \
               --verify-tag

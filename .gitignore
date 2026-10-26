@@ -27,6 +27,17 @@ build/linux/appimage/build/
 *.rpm
 *.dmg
 *.app
+*.apk
+*.aab
+
+# Android build output (generated: overlay, Go shared library, Gradle state)
+build/android/overlay.json
+build/android/gen/
+build/android/.gradle/
+build/android/build/
+build/android/local.properties
+build/android/app/build/
+build/android/app/src/main/jniLibs/
 
 # Qoder agent session state
 .zcode/

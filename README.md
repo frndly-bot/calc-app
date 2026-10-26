@@ -18,7 +18,7 @@ A native desktop calculator with four modes — **Normal**, **Scientific**, **De
 
 ## Download
 
-Grab the latest Linux build from [Releases](https://github.com/frndly-bot/calc-app/releases/latest). Pushing a `v*` tag builds and publishes the AppImage, Debian, RPM and Arch packages; asset names include the version (for example `calc-app_1.2.3_amd64.deb`) and releases produced by that workflow include a `SHA256SUMS` file.
+Grab the latest build from [Releases](https://github.com/frndly-bot/calc-app/releases/latest). Pushing a `v*` tag builds and publishes Linux packages, a macOS (Apple Silicon) dmg and an Android APK; asset names include the version (for example `calc-app_1.2.3_amd64.deb`) and every release includes a `SHA256SUMS` file.
 
 | Package | Best for | Install |
 | --- | --- | --- |
@@ -26,11 +26,15 @@ Grab the latest Linux build from [Releases](https://github.com/frndly-bot/calc-a
 | `calc-app*.deb` | Debian, Ubuntu, Mint | `sudo apt install ./calc-app*.deb` |
 | `calc-app*.rpm` | Fedora, RHEL, openSUSE | `sudo dnf install ./calc-app*.rpm` |
 | `calc-app*.pkg.tar.zst` | Arch Linux | `sudo pacman -U calc-app*.pkg.tar.zst` |
-| `calc-app` or `calc-app_*_linux_amd64` | Portable raw binary | `chmod +x <file> && ./<file>` |
+| `calc-app` or `calc-app_*_linux_amd64` | Portable raw Linux binary | `chmod +x <file> && ./<file>` |
+| `Calc*-arm64.dmg` | macOS 12+ on Apple Silicon | Open the dmg and drag **Calc** to Applications |
+| `calc-app*_android_arm64.apk` | Android 5.0+ (arm64 devices) | Side-load the APK and allow installs from this source |
 
 The .deb and .rpm packages pull in GTK4 and WebKitGTK 6.0 automatically. The AppImage and raw binary use the system webview, so install `libgtk-4-1` and `libwebkitgtk-6.0-4` first on minimal distributions.
 
-macOS and Windows builds are not published yet; see [docs/packaging.md](docs/packaging.md) to build them locally.
+The macOS build is ad-hoc signed, so the first launch may need a right-click → **Open** (or `xattr -d com.apple.quarantine /Applications/Calc.app`). The Android APK is signed with the project's debug keystore for side-loading; Google Play uploads need a release keystore (see [docs/packaging.md](docs/packaging.md)).
+
+Windows and Intel Mac builds are not published yet; see [docs/packaging.md](docs/packaging.md) to build them locally.
 
 When the release includes checksums, verify a download with:
 
@@ -80,7 +84,7 @@ sha256sum --check SHA256SUMS
 | Frontend | SvelteKit 3, Svelte 5 runes, TypeScript, Vite 8 |
 | Styling | Hand-written CSS, glass surfaces, per-mode CSS variables |
 | Tests | `go test`, Vitest, Playwright |
-| Packaging | Task, Wails v3 platform taskfiles, NSIS, AppImage/deb, .app/dmg |
+| Packaging | Task, Wails v3 platform taskfiles, NSIS, AppImage/deb, .app/dmg, Gradle/APK |
 
 ## Quick start
 
@@ -149,7 +153,7 @@ The first E2E run needs a browser: `pnpm --dir frontend exec playwright install 
 │       ├── lib/stores/     # settings, mode, memory, history, toast (runes)
 │       ├── lib/eval/       # TypeScript evaluator used by Normal mode
 │       └── lib/bindings/   # typed wrappers over Wails runtime calls
-├── build/                  # icons, platform taskfiles, packaging configs
+├── build/                  # icons, platform taskfiles, packaging configs, Android project
 ├── docs/                   # architecture, modes, development, packaging
 └── .github/workflows/ci.yml
 ```
@@ -161,6 +165,7 @@ Application state lives in the OS config directory:
 - Linux: `$XDG_CONFIG_HOME/calc-app/` (defaults to `~/.config/calc-app/`)
 - macOS: `~/Library/Application Support/calc-app/`
 - Windows: `%AppData%\calc-app\`
+- Android: the app's private files directory (`getFilesDir()/calc-app/`)
 
 `settings.json` holds preferences; `history.json` keeps the newest 200 calculations. Writes are atomic (temp file + rename).
 

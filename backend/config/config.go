@@ -9,13 +9,14 @@ import (
 )
 
 // Dir returns the directory where calc-app stores its data, creating it if
-// needed. XDG_CONFIG_HOME takes precedence, otherwise the OS config directory
-// is used (~/.config, ~/Library/Application Support, %AppData%).
+// needed. XDG_CONFIG_HOME takes precedence, otherwise the platform storage
+// root is used (~/.config, ~/Library/Application Support, %AppData%, or the
+// app's private files directory on Android).
 func Dir() (string, error) {
 	if xdg := os.Getenv("XDG_CONFIG_HOME"); xdg != "" {
 		return ensureDir(filepath.Join(xdg, "calc-app"))
 	}
-	base, err := os.UserConfigDir()
+	base, err := storageRoot()
 	if err != nil {
 		return "", err
 	}

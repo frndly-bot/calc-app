@@ -5,6 +5,10 @@ includes:
   windows: ./build/windows/Taskfile.yml
   darwin: ./build/darwin/Taskfile.yml
   linux: ./build/linux/Taskfile.yml
+  android:
+    taskfile: ./build/android/Taskfile.yml
+    vars:
+      APP_ID: com.zcode.calc
 
 vars:
   APP_NAME: calc-app

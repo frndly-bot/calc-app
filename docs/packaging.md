@@ -7,6 +7,7 @@ The app ships as a single native executable with the frontend embedded. Packagin
 | Linux | `bin/calc-app` | AppImage, `.deb` (optional `.rpm`, Arch package) |
 | Windows | `bin/calc-app.exe` | NSIS installer with WebView2 bootstrapper |
 | macOS | `.app` bundle | `.app`, compressed `.dmg` (native or universal) |
+| Android | `bin/calc-app.apk` | Release APK (arm64 by default, fat APK optional) |
 
 ## Metadata
 
@@ -20,6 +21,7 @@ Version and product metadata live in several places. Keep them in sync when rele
 | [build/windows/info.json](../build/windows/info.json) | File/product version, company, description |
 | [build/windows/nsis/project.nsi](../build/windows/nsis/project.nsi) | Installer version, publisher, display name |
 | [build/linux/nfpm/nfpm.yaml](../build/linux/nfpm/nfpm.yaml) | Package version, maintainer, dependencies |
+| [build/android/app/build.gradle](../build/android/app/build.gradle) | `applicationId` (`com.zcode.calc`), `versionCode`, `versionName` |
 | [frontend/package.json](../frontend/package.json) | Frontend package version |
 | `build/darwin/Taskfile.yml` | `APP_VERSION` used in the DMG filename |
 
@@ -170,7 +172,37 @@ The committed configuration is suitable for local builds and internal distributi
 3. Sign the `.app`, then sign the `.dmg`.
 4. Submit for notarization with `notarytool` and staple the ticket.
 
-These steps require Apple credentials and are intentionally not automated in the repository.
+These steps require Apple credentials and are intentionally not automated in the repository. The release workflow signs the published `.dmg` ad hoc, so macOS Gatekeeper asks for a right-click → **Open** on first launch (or `xattr -d com.apple.quarantine /Applications/Calc.app`).
+
+## Android
+
+The Android app is a native package built from the same `main.go`: the Go code is compiled to `libwails.so` with the Android NDK (`-buildmode=c-shared`), and a small Java host (`MainActivity` + Wails bridge classes, vendored under [build/android](../build/android)) renders the frontend in a system WebView with in-process asset serving.
+
+Prerequisites:
+
+- JDK 21 (`JAVA_HOME` set if `java` is not on `PATH`).
+- The Android SDK with `platform-tools`, `platforms;android-35`, `build-tools;35.0.0` and the NDK r26+ (`ANDROID_HOME` set; `ANDROID_NDK_HOME` optional — the newest installed NDK is picked).
+- The Wails CLI and `task`.
+
+Build and install:
+
+```bash
+task android:run            # debug build in the Android Emulator
+task android:run:device     # debug build on a connected device
+task android:package        # release APK (arm64), bin/calc-app.apk
+task android:package:fat    # release APK with arm64 + x86_64
+task android:bundle         # release AAB for Play Store uploads
+```
+
+Configuration lives in [build/android](../build/android):
+
+- `app/build.gradle` — `applicationId com.zcode.calc`, `versionName` (stamped from the release tag by CI), ABI filters;
+- `app/src/main/res/values/strings.xml` — the launcher label ("Calc");
+- the root `Taskfile.yml` passes `APP_ID: com.zcode.calc` to the Android tasks.
+
+Release builds are signed with the **debug keystore unless** the `ANDROID_KEYSTORE_FILE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD` environment variables are set. Debug-signed APKs install fine for side-loading ("install unknown apps" permission); Play Store uploads require a real keystore. Java bridge classes stay in the `com.wails.app` namespace; only the published application id is product-specific.
+
+On Android the app stores its state in the private files directory (`getFilesDir()/calc-app/`) — [backend/config](../backend/config) resolves it through the Wails mobile bridge, because the JVM process has no `HOME` for `os.UserConfigDir`. Window-geometry APIs are no-ops (apps run fullscreen) and the UI is responsive down to phone widths.
 
 ## CI
 
@@ -181,9 +213,14 @@ These steps require Apple credentials and are intentionally not automated in the
 - runs `svelte-check`, Vitest, Playwright and the production frontend build;
 - builds the Linux desktop binary with `CGO_ENABLED=1`.
 
-CI validates the project but does not publish packages. Pushing a `v*` tag triggers [.github/workflows/release.yml](../.github/workflows/release.yml), which builds the Linux binary, AppImage, `.deb`, `.rpm` and Arch package, writes `SHA256SUMS`, and creates the GitHub release with generated notes. The package version comes from the tag, and the hardcoded versions in `build/config.yml` and `build/linux/nfpm/nfpm.yaml` are rewritten in the runner only.
+CI validates the project but does not publish packages. Pushing a `v*` tag triggers [.github/workflows/release.yml](../.github/workflows/release.yml), which runs three build jobs and publishes one release:
 
-Windows and macOS artifacts require their own runners (for example a GitHub Actions matrix with `windows-latest` and `macos-latest`), because the platform Taskfiles call native tools (`makensis`, `hdiutil`, `lipo`, `codesign`).
+- **linux** (ubuntu-24.04) — runs the full test suite, builds the binary, AppImage, `.deb`, `.rpm` and Arch package;
+- **macos** (macos-latest, Apple Silicon) — builds the production `.app` (ad-hoc signed) and a compressed `.dmg`;
+- **android** (ubuntu-24.04) — installs SDK platform 35, build-tools and NDK r26, compiles `libwails.so` for arm64 and assembles the release APK;
+- **publish** — merges the artifacts, writes `SHA256SUMS` and creates the GitHub release with generated notes.
+
+The package version comes from the tag, and the hardcoded versions in `build/config.yml`, `build/linux/nfpm/nfpm.yaml` and `build/android/app/build.gradle` are rewritten in the runners only.
 
 ## Release checklist
 
@@ -195,13 +232,13 @@ Windows and macOS artifacts require their own runners (for example a GitHub Acti
 6. **Packages** — run `task package` on each target OS; verify the artifacts launch from a clean install.
 7. **Signing** — sign Windows/macOS artifacts where distribution requires it; document checksums.
 8. **Evidence** — refresh `docs/screenshots/` if the UI changed, and update the README feature list.
-9. **Tag and publish** — push an annotated tag matching the version (`git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3`). The release workflow publishes the Linux artifacts; attach Windows/macOS builds manually.
+9. **Tag and publish** — push an annotated tag matching the version (`git tag -a v1.2.3 -m "v1.2.3" && git push origin v1.2.3`). The release workflow publishes the Linux packages, the macOS arm64 dmg and the Android APK automatically; attach Windows/Intel-mac builds manually.
 
 ## What is not included
 
 - Automatic updates.
-- Code signing certificates or notarization credentials.
-- A cross-platform release pipeline that builds every installer in one workflow. The tag workflow publishes Linux packages only.
-- Package repository publishing (APT/RPM/Homebrew/Chocolatey).
+- Code signing certificates or notarization credentials (macOS releases are ad-hoc signed; Android releases use the debug keystore unless `ANDROID_KEYSTORE_*` secrets are provided).
+- Windows and Intel-mac (amd64) packages — their taskfiles exist and build on the matching machine, but no CI runner is configured for them.
+- Package repository publishing (APT/RPM/Homebrew/Chocolatey/Play Store).
 
 These require external accounts, secrets and infrastructure and should be added deliberately when the project has a distribution target.
